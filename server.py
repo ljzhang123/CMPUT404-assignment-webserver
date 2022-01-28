@@ -32,7 +32,55 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.data = self.data.split()
+
+        CODE_200 = bytearray("HTTP/1.1 200 OK\r\n", 'utf-8')
+        CODE_301 = bytearray("HTTP/1.1 301 Moved Permanently\r\n", 'utf-8')
+        CODE_404 = bytearray("HTTP/1.1 404 Not Found\r\n", 'utf-8')
+        CODE_405 = bytearray("HTTP/1.1 405 Method Not Allowed\r\n", 'utf-8')
+        cssContentType = bytearray("Content-Type: text/css\r\n", 'utf-8')
+        htmlContentType = bytearray("Content-Type: text/html\r\n", 'utf-8')
+
+        reqMethod = self.data[0].decode()
+        path = self.data[1].decode()
+
+        if reqMethod == 'GET':
+            if path.endswith('/'):
+                try:
+                    with open('www'+path+'index.html', 'r') as file:
+                        self.request.sendall(CODE_200 + htmlContentType + bytearray("\r\n" + file.read(), 'utf-8'))
+                except FileNotFoundError:
+                    self.request.sendall(CODE_404 + bytearray("\r\n", 'utf-8'))
+            
+            elif path.endswith('.css'):
+                try:
+                    with open('www'+path, 'r') as file:
+                        self.request.sendall(CODE_200 + cssContentType + bytearray("\r\n" + file.read(), 'utf-8'))
+                except FileNotFoundError:
+                    self.request.sendall(CODE_404 + bytearray("\r\n", 'utf-8'))
+            
+            elif path.endswith('.html'):
+                try:
+                    with open('www'+path, 'r') as file:
+                        self.request.sendall(CODE_200 + htmlContentType + bytearray("\r\n" + file.read(), 'utf-8'))
+                except FileNotFoundError:
+                    self.request.sendall(CODE_404 + bytearray("\r\n", 'utf-8'))
+            
+            elif path.startswith('/../'):
+                self.request.sendall(CODE_404 + bytearray("\r\n", 'utf-8'))
+
+            else:
+                path += '/'
+                try:
+                    with open('www'+path+'index.html', 'r') as file:
+                        file.read()
+                except FileNotFoundError:
+                    self.request.sendall(CODE_404 + bytearray("\r\n", 'utf-8'))
+                else:
+                    self.request.sendall(CODE_301 + bytearray(f"Location: {path}\r\n\r\n", 'utf-8'))
+
+        else:
+            self.request.sendall(CODE_405 + bytearray("\r\n", 'utf-8'))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
